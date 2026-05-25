@@ -119,6 +119,18 @@ export default function App() {
     const [trackDuration, setTrackDuration] = useState(0);
     const [volume, setVolume] = useState(0.5);
     
+    // Preview Mode Fallback States (for Free/Mobile users)
+    const [isPreviewMode, setIsPreviewMode] = useState(false);
+    const [isGuestMode, setIsGuestMode] = useState(false);
+    const [previewQueue, setPreviewQueue] = useState([]);
+    const [previewIndex, setPreviewIndex] = useState(-1);
+    const previewAudioRef = useRef(null);
+    const deviceIdRef = useRef(null);
+
+    useEffect(() => {
+        deviceIdRef.current = deviceId;
+    }, [deviceId]);
+    
     // Window Management
     const [openApps, setOpenApps] = useState(['app-spotify', 'app-photos', 'app-terminal']);
     const [activeApp, setActiveApp] = useState('app-spotify');
@@ -214,7 +226,31 @@ export default function App() {
         if (player) player.disconnect();
         setPlayer(null);
         setDeviceId(null);
+        if (previewAudioRef.current) {
+            previewAudioRef.current.pause();
+            previewAudioRef.current = null;
+        }
+        setIsPreviewMode(false);
+        setIsGuestMode(false);
+        setPreviewQueue([]);
+        setPreviewIndex(-1);
     };
+
+    const handleGuestMode = () => {
+        setIsGuestMode(true);
+        setIsPreviewMode(true);
+        // Play static/featured lofi genre on start so there's music right away
+        playGenreOrSong("lofi study", true);
+    };
+
+    // Clean up local audio player on unmount
+    useEffect(() => {
+        return () => {
+            if (previewAudioRef.current) {
+                previewAudioRef.current.pause();
+            }
+        };
+    }, []);
 
     // 2. System Clock
     useEffect(() => {
@@ -253,6 +289,14 @@ export default function App() {
         script.async = true;
         document.body.appendChild(script);
 
+        // Connection timeout to fallback to Preview Mode (e.g. for Free users or Mobile browsers)
+        const connectionTimeout = setTimeout(() => {
+            if (!deviceIdRef.current) {
+                console.warn("Spotify SDK connection timed out. Falling back to Preview Mode.");
+                setIsPreviewMode(true);
+            }
+        }, 5000);
+
         window.onSpotifyWebPlaybackSDKReady = () => {
             const spotifyPlayer = new window.Spotify.Player({
                 name: 'Sahilpreet OS Web Player',
@@ -262,12 +306,32 @@ export default function App() {
 
             spotifyPlayer.addListener('ready', ({ device_id }) => {
                 console.log('Ready with Device ID', device_id);
+                clearTimeout(connectionTimeout);
                 setDeviceId(device_id);
+                setIsPreviewMode(false);
             });
 
             spotifyPlayer.addListener('not_ready', ({ device_id }) => {
                 console.log('Device ID has gone offline', device_id);
                 setDeviceId(null);
+            });
+
+            spotifyPlayer.addListener('initialization_error', ({ message }) => {
+                console.warn('Spotify SDK Initialization Error (mobile/unsupported browser fallback):', message);
+                clearTimeout(connectionTimeout);
+                setIsPreviewMode(true);
+            });
+
+            spotifyPlayer.addListener('authentication_error', ({ message }) => {
+                console.warn('Spotify SDK Authentication Error:', message);
+                clearTimeout(connectionTimeout);
+                setIsPreviewMode(true);
+            });
+
+            spotifyPlayer.addListener('account_error', ({ message }) => {
+                console.warn('Spotify SDK Account Error (free user fallback):', message);
+                clearTimeout(connectionTimeout);
+                setIsPreviewMode(true);
             });
 
             spotifyPlayer.addListener('player_state_changed', (state) => {
@@ -285,35 +349,70 @@ export default function App() {
         };
 
         return () => {
+            clearTimeout(connectionTimeout);
             if (player) player.disconnect();
         };
-    }, [spotifyToken]);
+    }, [spotifyToken, player]);
 
     // Spotify API Search
     const searchMusic = async (query) => {
-        if (!query || !spotifyToken) return;
+        if (!query) return;
+        if (!spotifyToken && !isGuestMode) return;
         setIsSearching(true);
         try {
-            const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`, {
-                headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
+            let res;
+            if (spotifyToken) {
+                res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`, {
+                    headers: { 'Authorization': `Bearer ${spotifyToken}` }
+                });
+            } else {
+                res = await fetch(`/api/spotify-search?q=${encodeURIComponent(query)}&limit=10`);
+            }
             const data = await res.json();
             if (data.tracks && data.tracks.items) {
                 setSearchResults(data.tracks.items);
             }
         } catch (error) {
             console.error("Spotify Search Error:", error);
-            alert("Search failed. Please check your token.");
+            alert("Search failed. Please check your connection.");
         } finally {
             setIsSearching(false);
         }
     };
 
     // Play Specific Track via SDK (with support for context/queues)
-    const playSpotifyTrack = async (uri, contextUris = []) => {
+    const playSpotifyTrack = async (uri, contextTracks = []) => {
+        // If we are in Preview Mode or don't have a device ID (SDK unsupported / Free user / Mobile)
+        if (isPreviewMode || !deviceId) {
+            setIsPreviewMode(true); // Lock to preview mode
+
+            let trackToPlay = null;
+            if (contextTracks.length > 0) {
+                if (typeof contextTracks[0] === 'object') {
+                    trackToPlay = contextTracks.find(t => t.uri === uri);
+                    setPreviewQueue(contextTracks);
+                    setPreviewIndex(contextTracks.findIndex(t => t.uri === uri));
+                } else {
+                    // It's an array of URIs. Let's find it in searchResults or contextTracks
+                    trackToPlay = searchResults.find(t => t.uri === uri);
+                    setPreviewQueue(searchResults);
+                    setPreviewIndex(searchResults.findIndex(t => t.uri === uri));
+                }
+            } else {
+                trackToPlay = searchResults.find(t => t.uri === uri);
+                setPreviewQueue(searchResults.length > 0 ? searchResults : [trackToPlay]);
+                setPreviewIndex(searchResults.length > 0 ? searchResults.findIndex(t => t.uri === uri) : 0);
+            }
+
+            if (!trackToPlay) return;
+            playPreview(trackToPlay);
+            return;
+        }
+
+        // Standard Premium SDK Playback
         if (!deviceId || !spotifyToken) return;
-        const body = contextUris.length > 0 
-            ? { uris: contextUris, offset: { uri: uri } }
+        const body = contextTracks.length > 0 
+            ? { uris: contextTracks.map(t => typeof t === 'object' ? t.uri : t), offset: { uri: uri } }
             : { uris: [uri] };
         await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
             method: 'PUT',
@@ -325,10 +424,63 @@ export default function App() {
         });
     };
 
-    // Incremental progress updater hook
+    // playPreview local HTML5 audio player
+    const playPreview = (track) => {
+        if (!track) return;
+        
+        // Stop current audio if playing
+        if (previewAudioRef.current) {
+            previewAudioRef.current.pause();
+        }
+
+        if (!track.preview_url) {
+            alert("Bhai, Spotify free account/SDK context mein iss track ka preview URL nahi de raha!");
+            return;
+        }
+
+        // Create new Audio object
+        const audio = new Audio(track.preview_url);
+        audio.volume = volume;
+        previewAudioRef.current = audio;
+        
+        setSpotifyPlaying(true);
+        setCurrentTrack({
+            name: track.name,
+            album: {
+                images: track.album.images
+            },
+            artists: track.artists,
+            uri: track.uri,
+            preview_url: track.preview_url
+        });
+        
+        setTrackProgress(0);
+        setTrackDuration(30000); // Previews are always 30 seconds
+
+        audio.play().catch(err => {
+            console.error("Audio playback failed:", err);
+        });
+
+        // Set up progress tracking
+        audio.ontimeupdate = () => {
+            setTrackProgress(audio.currentTime * 1000);
+        };
+
+        // When song ends
+        audio.onended = () => {
+            if (repeatMode === 'track') {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.error(e));
+            } else {
+                handleNextTrack();
+            }
+        };
+    };
+
+    // Incremental progress updater hook (only for Premium SDK mode)
     useEffect(() => {
         let interval;
-        if (spotifyPlaying) {
+        if (spotifyPlaying && !isPreviewMode) {
             interval = setInterval(() => {
                 setTrackProgress(prev => {
                     if (prev + 1000 > trackDuration) {
@@ -339,22 +491,25 @@ export default function App() {
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [spotifyPlaying, trackDuration]);
+    }, [spotifyPlaying, trackDuration, isPreviewMode]);
 
     // Spotify controls handlers
     const toggleSpotifyRepeat = async () => {
         if (!spotifyToken) return;
         const nextMode = repeatMode === 'off' ? 'track' : repeatMode === 'track' ? 'context' : 'off';
         setRepeatMode(nextMode);
-        try {
-            await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${nextMode}${deviceId ? `&device_id=${deviceId}` : ''}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${spotifyToken}`
-                }
-            });
-        } catch (e) {
-            console.error("Error setting repeat mode:", e);
+        
+        if (!isPreviewMode) {
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${nextMode}${deviceId ? `&device_id=${deviceId}` : ''}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${spotifyToken}`
+                    }
+                });
+            } catch (e) {
+                console.error("Error setting repeat mode:", e);
+            }
         }
     };
 
@@ -362,22 +517,30 @@ export default function App() {
         if (!spotifyToken) return;
         const nextShuffle = !shuffleMode;
         setShuffleMode(nextShuffle);
-        try {
-            await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${nextShuffle}${deviceId ? `&device_id=${deviceId}` : ''}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${spotifyToken}`
-                }
-            });
-        } catch (e) {
-            console.error("Error setting shuffle mode:", e);
+        
+        if (!isPreviewMode) {
+            try {
+                await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${nextShuffle}${deviceId ? `&device_id=${deviceId}` : ''}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${spotifyToken}`
+                    }
+                });
+            } catch (e) {
+                console.error("Error setting shuffle mode:", e);
+            }
         }
     };
 
     const handleVolumeChange = async (e) => {
         const newVolume = Number(e.target.value);
         setVolume(newVolume);
-        if (player) {
+        
+        if (isPreviewMode) {
+            if (previewAudioRef.current) {
+                previewAudioRef.current.volume = newVolume;
+            }
+        } else if (player) {
             try {
                 await player.setVolume(newVolume);
             } catch (err) {
@@ -387,30 +550,101 @@ export default function App() {
     };
 
     const handleSeek = async (e) => {
-        if (!player) return;
         const newProgress = Number(e.target.value);
         setTrackProgress(newProgress);
-        try {
-            await player.seek(newProgress);
-        } catch (err) {
-            console.error("Error seeking:", err);
+        
+        if (isPreviewMode) {
+            if (previewAudioRef.current) {
+                previewAudioRef.current.currentTime = newProgress / 1000;
+            }
+        } else if (player) {
+            try {
+                await player.seek(newProgress);
+            } catch (err) {
+                console.error("Error seeking:", err);
+            }
+        }
+    };
+
+    const handleNextTrack = () => {
+        if (isPreviewMode) {
+            if (previewQueue.length > 0 && previewIndex < previewQueue.length - 1) {
+                const nextIdx = previewIndex + 1;
+                setPreviewIndex(nextIdx);
+                playPreview(previewQueue[nextIdx]);
+            } else if (repeatMode === 'context' && previewQueue.length > 0) {
+                setPreviewIndex(0);
+                playPreview(previewQueue[0]);
+            } else {
+                setSpotifyPlaying(false);
+            }
+        } else {
+            player?.nextTrack();
+        }
+    };
+
+    const handlePrevTrack = () => {
+        if (isPreviewMode) {
+            if (previewQueue.length > 0 && previewIndex > 0) {
+                const prevIdx = previewIndex - 1;
+                setPreviewIndex(prevIdx);
+                playPreview(previewQueue[prevIdx]);
+            } else if (repeatMode === 'context' && previewQueue.length > 0) {
+                const lastIdx = previewQueue.length - 1;
+                setPreviewIndex(lastIdx);
+                playPreview(previewQueue[lastIdx]);
+            }
+        } else {
+            player?.previousTrack();
+        }
+    };
+
+    const handleTogglePlay = () => {
+        if (isPreviewMode) {
+            if (previewAudioRef.current) {
+                if (spotifyPlaying) {
+                    previewAudioRef.current.pause();
+                    setSpotifyPlaying(false);
+                } else {
+                    previewAudioRef.current.play().catch(e => console.error(e));
+                    setSpotifyPlaying(true);
+                }
+            }
+        } else {
+            player?.togglePlay();
         }
     };
 
     // Helper to search and play a search query as a playlist queue
-    const playGenreOrSong = async (query) => {
-        if (!spotifyToken || !deviceId) return;
+    const playGenreOrSong = async (query, forcePreview = false) => {
+        if (!spotifyToken && !isGuestMode && !forcePreview) return;
+        setIsSearching(true);
         try {
-            const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`, {
-                headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
+            let res;
+            if (spotifyToken) {
+                res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`, {
+                    headers: { 'Authorization': `Bearer ${spotifyToken}` }
+                });
+            } else {
+                res = await fetch(`/api/spotify-search?q=${encodeURIComponent(query)}&limit=20`);
+            }
             const data = await res.json();
             if (data.tracks && data.tracks.items.length > 0) {
-                const uris = data.tracks.items.map(t => t.uri);
-                await playSpotifyTrack(uris[0], uris);
+                const tracks = data.tracks.items;
+                if (isPreviewMode || forcePreview || !deviceId) {
+                    setIsPreviewMode(true);
+                    setPreviewQueue(tracks);
+                    setPreviewIndex(0);
+                    playPreview(tracks[0]);
+                } else {
+                    const uris = tracks.map(t => t.uri);
+                    await playSpotifyTrack(uris[0], tracks);
+                }
             }
         } catch (error) {
             console.error("Play genre error:", error);
+        } finally {
+            setIsSearching(false);
         }
     };
 
@@ -523,22 +757,29 @@ export default function App() {
             {openApps.includes('app-spotify') && (
                 <DraggableWindow id="app-spotify" title="Spotify Web Player" dark defaultPos={{x: 200, y: 100}} width="w-[820px]" height="h-[530px]" isActive={activeApp === 'app-spotify'} bringToFront={setActiveApp} closeApp={handleCloseApp}>
                     <div className="flex flex-col h-full bg-[#121212] text-white relative">
-                        {!spotifyToken ? (
+                        {!spotifyToken && !isGuestMode ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#1e1e1e] to-[#121212]">
                                 <Music size={64} className="text-[#1DB954] mb-6 animate-bounce" />
-                                <h2 className="text-2xl font-bold mb-2">Login with Spotify Premium</h2>
-                                <p className="text-gray-400 text-sm mb-8 max-w-md">Connect your Spotify account securely to play full songs directly inside this OS.</p>
+                                <h2 className="text-2xl font-bold mb-2">Login with Spotify</h2>
+                                <p className="text-gray-400 text-sm mb-6 max-w-md">Connect your Spotify account securely to play full songs directly inside this OS.</p>
                                 <button 
                                     onClick={handleSpotifyLogin}
-                                    className="bg-[#1DB954] text-black font-extrabold px-10 py-3.5 rounded-full hover:scale-105 hover:bg-green-400 transition-all shadow-[0_0_20px_rgba(29,185,84,0.4)]"
+                                    className="bg-[#1DB954] text-black font-extrabold px-10 py-3.5 rounded-full hover:scale-105 hover:bg-green-400 transition-all shadow-[0_0_20px_rgba(29,185,84,0.4)] mb-4"
                                 >
                                     Log in with Spotify
                                 </button>
-                                <p className="text-xs text-gray-600 mt-6 max-w-sm">
-                                    Requires a valid <code className="bg-white/10 px-1 rounded">CLIENT_ID</code> in code.
-                                </p>
+                                <button 
+                                    onClick={handleGuestMode}
+                                    className="bg-transparent border border-white/20 text-white font-bold px-8 py-2.5 rounded-full hover:scale-105 hover:bg-white/10 transition-all text-sm mb-6"
+                                >
+                                    Bina Login Ke Suniye (Guest Mode)
+                                </button>
+                                <div className="text-xs text-gray-500 max-w-md space-y-1 bg-white/5 p-3 rounded-lg border border-white/10">
+                                    <p className="font-bold text-yellow-500">💡 Kisi aur ke phone se connect nahi ho raha?</p>
+                                    <p>Spotify development restriction ke karan kewal whitelisted log hi direct login kar sakte hain. Dusre phones/accounts ke liye kripya <strong>Guest Mode</strong> ka upyog karein!</p>
+                                </div>
                             </div>
-                        ) : !deviceId ? (
+                        ) : !deviceId && !isPreviewMode ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#1e1e1e] to-[#121212]">
                                 <Music size={64} className="text-[#1DB954] mb-6 animate-pulse" />
                                 <h2 className="text-2xl font-bold mb-2">Connecting...</h2>
@@ -567,6 +808,12 @@ export default function App() {
                                                 <span className="text-sm font-bold">Search</span>
                                             </div>
                                         </div>
+
+                                        {isGuestMode && (
+                                            <div className="mx-1 mb-4 px-2.5 py-1.5 rounded bg-green-500/10 border border-green-500/20 text-[#1DB954] text-[10px] font-extrabold text-center uppercase tracking-widest animate-pulse">
+                                                Guest Mode
+                                            </div>
+                                        )}
 
                                         {/* Playlists Section */}
                                         <div className="border-t border-[#282828] pt-4 flex-1 overflow-y-auto custom-scroll">
@@ -633,6 +880,11 @@ export default function App() {
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 {isSearching && <span className="text-[10px] text-[#1DB954] animate-pulse font-bold tracking-widest mr-2">SEARCHING...</span>}
+                                                {isPreviewMode && (
+                                                    <span className="text-[10px] bg-yellow-500/25 text-yellow-400 border border-yellow-500/30 px-2.5 py-1 rounded-full font-bold select-none mr-1 animate-pulse">
+                                                        Preview Mode (Free/Mobile)
+                                                    </span>
+                                                )}
                                                 <div className="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/5 cursor-default select-none">
                                                     <div className="w-5 h-5 rounded-full bg-[#1DB954] text-[10px] font-black text-black flex items-center justify-center">S</div>
                                                     <span className="text-xs font-bold text-white/95">Sahilpreet</span>
@@ -800,21 +1052,21 @@ export default function App() {
                                                 <Shuffle size={15} className={shuffleMode ? 'stroke-[2.5px]' : ''} />
                                             </button>
                                             <button 
-                                                onClick={() => player?.previousTrack()} 
+                                                onClick={handlePrevTrack} 
                                                 className="text-gray-400 hover:text-white transition-colors"
                                                 title="Previous"
                                             >
                                                 <SkipBack size={18} fill="currentColor" />
                                             </button>
                                             <button 
-                                                onClick={() => player?.togglePlay()} 
+                                                onClick={handleTogglePlay} 
                                                 className="w-8 h-8 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
                                                 title={spotifyPlaying ? "Pause" : "Play"}
                                             >
                                                 {spotifyPlaying ? <Pause size={14} className="text-black fill-black" /> : <Play size={14} className="text-black fill-black ml-0.5" />}
                                             </button>
                                             <button 
-                                                onClick={() => player?.nextTrack()} 
+                                                onClick={handleNextTrack} 
                                                 className="text-gray-400 hover:text-white transition-colors"
                                                 title="Next"
                                             >
