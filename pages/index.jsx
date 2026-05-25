@@ -93,7 +93,7 @@ export default function App() {
 
     // --- SPOTIFY OAUTH (LOGIN) CONSTANTS ---
     const SPOTIFY_CLIENT_ID = "2420d19b204e4423b0080864f124c9e3"; 
-    const SPOTIFY_REDIRECT_URI = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : 'http://localhost:3000';
+    const SPOTIFY_REDIRECT_URI = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://sahilos-nine.vercel.app/';
     const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
     const RESPONSE_TYPE = "token";
     const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state";
