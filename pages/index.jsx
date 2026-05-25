@@ -8,47 +8,16 @@ import {
     SkipBack, SkipForward, Volume2, Video, PlayCircle, Atom, Shuffle 
 } from 'lucide-react';
 
-// --- SPOTIFY PKCE HELPERS ---
-const SPOTIFY_STATIC_CODE_VERIFIER = "thisIsAConstantLongStaticCodeVerifierForSahilOsProjectToResolveMobileLoginRedirectIssues";
-
-const FALLBACK_TRACKS = [
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"
-];
-
-const generateRandomString = (length) => {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < length; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+const parseDurationToMs = (durationStr) => {
+    if (!durationStr) return 0;
+    if (typeof durationStr === 'number') return durationStr;
+    const parts = durationStr.split(':').map(Number);
+    if (parts.length === 2) {
+        return (parts[0] * 60 + parts[1]) * 1000;
+    } else if (parts.length === 3) {
+        return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
     }
-    return text;
-};
-
-const sha256 = async (plain) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plain);
-    return window.crypto.subtle.digest('SHA-256', data);
-};
-
-const base64urlencode = (a) => {
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(a)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-};
-
-const generateCodeChallenge = async (codeVerifier) => {
-    const hashed = await sha256(codeVerifier);
-    return base64urlencode(hashed);
+    return 0;
 };
 
 // --- Reusable Draggable Window Component ---
@@ -116,17 +85,14 @@ export default function App() {
     const [time, setTime] = useState('Loading...');
     const [wifiOn, setWifiOn] = useState(true);
 
-    // Spotify SDK States
-    const [spotifyToken, setSpotifyToken] = useState('');
-    const [deviceId, setDeviceId] = useState(null);
-    const [player, setPlayer] = useState(null);
+    // Player States
     const [spotifyPlaying, setSpotifyPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState(null);
     const [searchResults, setSearchResults] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     
-    // Spotify Player States
+    // Player UI States
     const [activeTab, setActiveTab] = useState('home');
     const [repeatMode, setRepeatMode] = useState('off'); // 'off', 'context', 'track'
     const [shuffleMode, setShuffleMode] = useState(false);
@@ -134,17 +100,9 @@ export default function App() {
     const [trackDuration, setTrackDuration] = useState(0);
     const [volume, setVolume] = useState(0.5);
     
-    // Preview Mode Fallback States (for Free/Mobile users)
-    const [isPreviewMode, setIsPreviewMode] = useState(false);
-    const [isGuestMode, setIsGuestMode] = useState(false);
+    // Play Queue States
     const [previewQueue, setPreviewQueue] = useState([]);
     const [previewIndex, setPreviewIndex] = useState(-1);
-    const previewAudioRef = useRef(null);
-    const deviceIdRef = useRef(null);
-
-    useEffect(() => {
-        deviceIdRef.current = deviceId;
-    }, [deviceId]);
     
     // Window Management
     const [openApps, setOpenApps] = useState(['app-spotify', 'app-photos', 'app-terminal']);
@@ -154,116 +112,46 @@ export default function App() {
     const [isPlayingVideo, setIsPlayingVideo] = useState(false);
     const [videoProgress, setVideoProgress] = useState(0);
 
-    // --- SPOTIFY OAUTH (LOGIN) CONSTANTS ---
-    const SPOTIFY_CLIENT_ID = "2420d19b204e4423b0080864f124c9e3"; 
-    const SPOTIFY_REDIRECT_URI = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://sahilos-nine.vercel.app/';
-    const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
-    const RESPONSE_TYPE = "token";
-    const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state";
+    // YouTube Player Initialization & References
+    const ytPlayerRef = useRef(null);
+    const [ytPlayerReady, setYtPlayerReady] = useState(false);
+    const previewQueueRef = useRef([]);
+    const previewIndexRef = useRef(-1);
+    const onStateChangeRef = useRef(null);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Handle Spotify Login & Token Extraction
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        let token = window.localStorage.getItem("spotifyToken");
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-
-        if (code) {
-            const codeVerifier = SPOTIFY_STATIC_CODE_VERIFIER;
-            const fetchToken = async () => {
-                try {
-                    const response = await fetch('https://accounts.spotify.com/api/token', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: new URLSearchParams({
-                            client_id: SPOTIFY_CLIENT_ID,
-                            grant_type: 'authorization_code',
-                            code: code,
-                            redirect_uri: SPOTIFY_REDIRECT_URI,
-                            code_verifier: codeVerifier,
-                        }),
-                    });
-
-                    const data = await response.json();
-                    if (data.access_token) {
-                        window.localStorage.setItem("spotifyToken", data.access_token);
-                        setSpotifyToken(data.access_token);
-                        // Clean up URL query parameters
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    } else if (data.error) {
-                        console.error("Token exchange failed:", data.error_description || data.error);
-                    }
-                } catch (error) {
-                    console.error("Error exchanging Spotify code:", error);
-                }
-            };
-            fetchToken();
-        } else if (token) {
-            setSpotifyToken(token);
-        }
-    }, []);
-
-    // Login Redirect Function
-    const handleSpotifyLogin = async () => {
-        if (SPOTIFY_CLIENT_ID === "YOUR_CLIENT_ID_HERE") {
-            alert("Bhai code mein apna Spotify Client ID daalna mat bhoolna!");
-            return;
-        }
-
-        const codeVerifier = SPOTIFY_STATIC_CODE_VERIFIER;
-        const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-        const params = new URLSearchParams({
-            response_type: 'code',
-            client_id: SPOTIFY_CLIENT_ID,
-            scope: SCOPES,
-            redirect_uri: SPOTIFY_REDIRECT_URI,
-            code_challenge_method: 'S256',
-            code_challenge: codeChallenge,
-        });
-
-        window.location.href = `${AUTH_ENDPOINT}?${params.toString()}`;
-    };
-
-    // Logout Function
+    // Stop Music Function
     const handleSpotifyLogout = () => {
-        setSpotifyToken("");
-        window.localStorage.removeItem("spotifyToken");
-        if (player) player.disconnect();
-        setPlayer(null);
-        setDeviceId(null);
-        if (previewAudioRef.current) {
-            previewAudioRef.current.pause();
-            previewAudioRef.current = null;
+        if (ytPlayerRef.current && ytPlayerReady) {
+            try {
+                ytPlayerRef.current.stopVideo();
+            } catch (e) {
+                console.error("Error stopping video:", e);
+            }
         }
-        setIsPreviewMode(false);
-        setIsGuestMode(false);
+        setSpotifyPlaying(false);
+        setCurrentTrack(null);
+        setTrackProgress(0);
+        setTrackDuration(0);
         setPreviewQueue([]);
         setPreviewIndex(-1);
-    };
-
-    const handleGuestMode = () => {
-        setIsGuestMode(true);
-        setIsPreviewMode(true);
-        // Play static/featured lofi genre on start so there's music right away
-        playGenreOrSong("lofi study", true);
     };
 
     // Clean up local audio player on unmount
     useEffect(() => {
         return () => {
-            if (previewAudioRef.current) {
-                previewAudioRef.current.pause();
+            if (ytPlayerRef.current && ytPlayerReady) {
+                try {
+                    ytPlayerRef.current.stopVideo();
+                } catch (e) {
+                    console.error("Error stopping video on unmount:", e);
+                }
             }
         };
-    }, []);
+    }, [ytPlayerReady]);
 
     // 2. System Clock
     useEffect(() => {
@@ -293,390 +181,268 @@ export default function App() {
         return () => clearInterval(interval);
     }, [isPlayingVideo]);
 
-    // Spotify Web Playback SDK Initialization
+
     useEffect(() => {
-        if (!spotifyToken) return;
+        previewQueueRef.current = previewQueue;
+    }, [previewQueue]);
 
-        const script = document.createElement("script");
-        script.src = "https://sdk.scdn.co/spotify-player.js";
-        script.async = true;
-        document.body.appendChild(script);
+    useEffect(() => {
+        previewIndexRef.current = previewIndex;
+    }, [previewIndex]);
 
-        // Connection timeout to fallback to Preview Mode (e.g. for Free users or Mobile browsers)
-        const connectionTimeout = setTimeout(() => {
-            if (!deviceIdRef.current) {
-                console.warn("Spotify SDK connection timed out. Falling back to Preview Mode.");
-                setIsPreviewMode(true);
-            }
-        }, 5000);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
 
-        window.onSpotifyWebPlaybackSDKReady = () => {
-            const spotifyPlayer = new window.Spotify.Player({
-                name: 'Sahilpreet OS Web Player',
-                getOAuthToken: cb => { cb(spotifyToken); },
-                volume: 0.5
-            });
-
-            spotifyPlayer.addListener('ready', ({ device_id }) => {
-                console.log('Ready with Device ID', device_id);
-                clearTimeout(connectionTimeout);
-                setDeviceId(device_id);
-                setIsPreviewMode(false);
-
-                // Transfer playback to this web player automatically
-                fetch('https://api.spotify.com/v1/me/player', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${spotifyToken}`
+        const initializeYTPlayer = () => {
+            if (ytPlayerRef.current) return;
+            const player = new window.YT.Player('yt-player', {
+                height: '0',
+                width: '0',
+                videoId: '',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 0,
+                    'disablekb': 1,
+                    'fs': 0,
+                    'rel': 0,
+                    'modestbranding': 1
+                },
+                events: {
+                    'onStateChange': (event) => {
+                        if (onStateChangeRef.current) {
+                            onStateChangeRef.current(event);
+                        }
                     },
-                    body: JSON.stringify({
-                        device_ids: [device_id],
-                        play: false
-                    })
-                }).catch(e => console.error("Error transferring playback:", e));
+                    'onReady': () => {
+                        setYtPlayerReady(true);
+                    }
+                }
             });
-
-            spotifyPlayer.addListener('not_ready', ({ device_id }) => {
-                console.log('Device ID has gone offline', device_id);
-                setDeviceId(null);
-            });
-
-            spotifyPlayer.addListener('initialization_error', ({ message }) => {
-                console.warn('Spotify SDK Initialization Error (mobile/unsupported browser fallback):', message);
-                clearTimeout(connectionTimeout);
-                setIsPreviewMode(true);
-            });
-
-            spotifyPlayer.addListener('authentication_error', ({ message }) => {
-                console.warn('Spotify SDK Authentication Error:', message);
-                clearTimeout(connectionTimeout);
-                setIsPreviewMode(true);
-            });
-
-            spotifyPlayer.addListener('account_error', ({ message }) => {
-                console.warn('Spotify SDK Account Error (free user fallback):', message);
-                clearTimeout(connectionTimeout);
-                setIsPreviewMode(true);
-            });
-
-            spotifyPlayer.addListener('player_state_changed', (state) => {
-                if (!state) return;
-                setSpotifyPlaying(!state.paused);
-                setCurrentTrack(state.track_window.current_track);
-                setTrackProgress(state.position);
-                setTrackDuration(state.duration);
-                setShuffleMode(state.shuffle);
-                setRepeatMode(state.repeat_mode === 0 ? 'off' : state.repeat_mode === 1 ? 'context' : 'track');
-            });
-
-            spotifyPlayer.connect();
-            setPlayer(spotifyPlayer);
+            ytPlayerRef.current = player;
         };
 
-        return () => {
-            clearTimeout(connectionTimeout);
-            if (player) player.disconnect();
-        };
-    }, [spotifyToken, player]);
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            window.onYouTubeIframeAPIReady = initializeYTPlayer;
+        } else if (window.YT && window.YT.Player) {
+            initializeYTPlayer();
+        }
+    }, []);
 
-    // Spotify API Search
+    // Safeguard event handler for state closure issues
+    onStateChangeRef.current = (event) => {
+        // YT.PlayerState: 0 = ended, 1 = playing, 2 = paused
+        if (event.data === 0) {
+            if (repeatMode === 'track') {
+                if (ytPlayerRef.current && ytPlayerReady) {
+                    ytPlayerRef.current.seekTo(0, true);
+                    ytPlayerRef.current.playVideo();
+                }
+            } else {
+                handleNextTrack();
+            }
+        } else if (event.data === 1) {
+            setSpotifyPlaying(true);
+        } else if (event.data === 2) {
+            setSpotifyPlaying(false);
+        }
+    };
+
+    // YouTube Music API Search
     const searchMusic = async (query) => {
-        if (!query) return;
-        if (!spotifyToken && !isGuestMode) return;
+        if (!query || !query.trim()) return;
         setIsSearching(true);
         try {
-            let res;
-            if (spotifyToken) {
-                res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`, {
-                    headers: { 'Authorization': `Bearer ${spotifyToken}` }
-                });
-            } else {
-                res = await fetch(`/api/spotify-search?q=${encodeURIComponent(query)}&limit=10`);
-            }
+            const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`);
             const data = await res.json();
-            if (data.tracks && data.tracks.items) {
-                setSearchResults(data.tracks.items);
+            if (data.tracks) {
+                const mappedTracks = data.tracks.map(track => ({
+                    id: track.id,
+                    name: track.title,
+                    artists: [{ name: track.artist }],
+                    album: {
+                        images: [{ url: track.thumbnail }]
+                    },
+                    uri: track.uri,
+                    duration: track.duration,
+                    duration_ms: parseDurationToMs(track.duration)
+                }));
+                setSearchResults(mappedTracks);
             }
         } catch (error) {
-            console.error("Spotify Search Error:", error);
+            console.error("YouTube Search Error:", error);
             alert("Search failed. Please check your connection.");
         } finally {
             setIsSearching(false);
         }
     };
 
-    // Play Specific Track via SDK (with support for context/queues)
-    const playSpotifyTrack = async (uri, contextTracks = []) => {
-        // If we are in Preview Mode or don't have a device ID (SDK unsupported / Free user / Mobile)
-        if (isPreviewMode || !deviceId) {
-            setIsPreviewMode(true); // Lock to preview mode
-
-            let trackToPlay = null;
-            if (contextTracks.length > 0) {
-                if (typeof contextTracks[0] === 'object') {
-                    trackToPlay = contextTracks.find(t => t.uri === uri);
-                    setPreviewQueue(contextTracks);
-                    setPreviewIndex(contextTracks.findIndex(t => t.uri === uri));
-                } else {
-                    // It's an array of URIs. Let's find it in searchResults or contextTracks
-                    trackToPlay = searchResults.find(t => t.uri === uri);
-                    setPreviewQueue(searchResults);
-                    setPreviewIndex(searchResults.findIndex(t => t.uri === uri));
-                }
-            } else {
-                trackToPlay = searchResults.find(t => t.uri === uri);
-                setPreviewQueue(searchResults.length > 0 ? searchResults : [trackToPlay]);
-                setPreviewIndex(searchResults.length > 0 ? searchResults.findIndex(t => t.uri === uri) : 0);
-            }
-
-            if (!trackToPlay) return;
-            playPreview(trackToPlay);
-            return;
-        }
-
-        // Standard Premium SDK Playback
-        if (!deviceId || !spotifyToken) return;
-        const body = contextTracks.length > 0 
-            ? { uris: contextTracks.map(t => typeof t === 'object' ? t.uri : t), offset: { uri: uri } }
-            : { uris: [uri] };
-        await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
-            method: 'PUT',
-            body: JSON.stringify(body),
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${spotifyToken}`
-            },
-        });
-    };
-
-    // playPreview local HTML5 audio player
-    const playPreview = (track) => {
+    // YouTube Play Track unified function
+    const playTrack = (track, queue = []) => {
         if (!track) return;
-        
-        // Stop current audio if playing
-        if (previewAudioRef.current) {
-            previewAudioRef.current.pause();
-        }
 
-        let playUrl = track.preview_url;
-        if (!playUrl) {
-            // Pick a deterministic fallback song based on track name
-            const str = track.name || "default";
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const index = Math.abs(hash) % FALLBACK_TRACKS.length;
-            playUrl = FALLBACK_TRACKS[index];
-        }
+        setPreviewQueue(queue.length > 0 ? queue : [track]);
+        const index = queue.length > 0 ? queue.findIndex(t => t.id === track.id) : 0;
+        setPreviewIndex(index);
 
-        // Create new Audio object
-        const audio = new Audio(playUrl);
-        audio.volume = volume;
-        previewAudioRef.current = audio;
-        
-        setSpotifyPlaying(true);
         setCurrentTrack({
-            name: track.name,
+            name: track.name || track.title,
             album: {
-                images: track.album.images
+                images: track.album?.images || [{ url: track.thumbnail }]
             },
-            artists: track.artists,
+            artists: track.artists || [{ name: track.artist }],
             uri: track.uri,
-            preview_url: playUrl
+            id: track.id,
+            duration: track.duration
         });
-        
+
+        const durationMs = track.duration_ms || parseDurationToMs(track.duration);
         setTrackProgress(0);
-        setTrackDuration(30000); // Default to 30s until metadata loads
+        setTrackDuration(durationMs > 0 ? durationMs : 240000);
 
-        audio.onloadedmetadata = () => {
-            setTrackDuration(audio.duration * 1000);
-        };
-
-        audio.play().catch(err => {
-            console.error("Audio playback failed:", err);
-        });
-
-        // Set up progress tracking
-        audio.ontimeupdate = () => {
-            setTrackProgress(audio.currentTime * 1000);
-        };
-
-        // When song ends
-        audio.onended = () => {
-            if (repeatMode === 'track') {
-                audio.currentTime = 0;
-                audio.play().catch(e => console.error(e));
-            } else {
-                handleNextTrack();
-            }
-        };
+        if (ytPlayerRef.current && ytPlayerReady) {
+            ytPlayerRef.current.loadVideoById(track.id);
+            ytPlayerRef.current.playVideo();
+            setSpotifyPlaying(true);
+        }
     };
 
-    // Incremental progress updater hook (only for Premium SDK mode)
+    // playSpotifyTrack compatibility wrapper
+    const playSpotifyTrack = (uri, contextTracks = []) => {
+        let trackToPlay = null;
+        if (contextTracks.length > 0) {
+            trackToPlay = contextTracks.find(t => t.uri === uri || t.id === uri || (typeof t === 'object' && t.uri === uri));
+        }
+        if (!trackToPlay) {
+            trackToPlay = searchResults.find(t => t.uri === uri || t.id === uri);
+        }
+        
+        if (!trackToPlay) {
+            const videoId = uri.startsWith('youtube:track:') ? uri.replace('youtube:track:', '') : uri;
+            trackToPlay = { 
+                id: videoId, 
+                uri: uri, 
+                name: "YouTube Song", 
+                artists: [{ name: "YouTube Music" }], 
+                album: { images: [{ url: "" }] } 
+            };
+        }
+
+        playTrack(trackToPlay, contextTracks);
+    };
+
+    // Poll current playback progress from YT Player
     useEffect(() => {
         let interval;
-        if (spotifyPlaying && !isPreviewMode) {
+        if (spotifyPlaying && ytPlayerRef.current && ytPlayerReady) {
             interval = setInterval(() => {
-                setTrackProgress(prev => {
-                    if (prev + 1000 > trackDuration) {
-                        return trackDuration;
+                if (ytPlayerRef.current && typeof ytPlayerRef.current.getCurrentTime === 'function') {
+                    const currentSecs = ytPlayerRef.current.getCurrentTime();
+                    setTrackProgress(currentSecs * 1000);
+                    
+                    const durationSecs = ytPlayerRef.current.getDuration();
+                    if (durationSecs > 0) {
+                        setTrackDuration(durationSecs * 1000);
                     }
-                    return prev + 1000;
-                });
-            }, 1000);
+                }
+            }, 500);
         }
         return () => clearInterval(interval);
-    }, [spotifyPlaying, trackDuration, isPreviewMode]);
+    }, [spotifyPlaying, ytPlayerReady]);
 
     // Spotify controls handlers
-    const toggleSpotifyRepeat = async () => {
-        if (!spotifyToken) return;
+    const toggleSpotifyRepeat = () => {
         const nextMode = repeatMode === 'off' ? 'track' : repeatMode === 'track' ? 'context' : 'off';
         setRepeatMode(nextMode);
-        
-        if (!isPreviewMode) {
-            try {
-                await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${nextMode}${deviceId ? `&device_id=${deviceId}` : ''}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${spotifyToken}`
-                    }
-                });
-            } catch (e) {
-                console.error("Error setting repeat mode:", e);
-            }
-        }
     };
 
-    const toggleSpotifyShuffle = async () => {
-        if (!spotifyToken) return;
-        const nextShuffle = !shuffleMode;
-        setShuffleMode(nextShuffle);
-        
-        if (!isPreviewMode) {
-            try {
-                await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${nextShuffle}${deviceId ? `&device_id=${deviceId}` : ''}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${spotifyToken}`
-                    }
-                });
-            } catch (e) {
-                console.error("Error setting shuffle mode:", e);
-            }
-        }
+    const toggleSpotifyShuffle = () => {
+        setShuffleMode(!shuffleMode);
     };
 
-    const handleVolumeChange = async (e) => {
+    const handleVolumeChange = (e) => {
         const newVolume = Number(e.target.value);
         setVolume(newVolume);
         
-        if (isPreviewMode) {
-            if (previewAudioRef.current) {
-                previewAudioRef.current.volume = newVolume;
-            }
-        } else if (player) {
-            try {
-                await player.setVolume(newVolume);
-            } catch (err) {
-                console.error("Error setting volume:", err);
-            }
+        if (ytPlayerRef.current && ytPlayerReady) {
+            ytPlayerRef.current.setVolume(newVolume * 100);
         }
     };
 
-    const handleSeek = async (e) => {
+    const handleSeek = (e) => {
         const newProgress = Number(e.target.value);
         setTrackProgress(newProgress);
         
-        if (isPreviewMode) {
-            if (previewAudioRef.current) {
-                previewAudioRef.current.currentTime = newProgress / 1000;
-            }
-        } else if (player) {
-            try {
-                await player.seek(newProgress);
-            } catch (err) {
-                console.error("Error seeking:", err);
-            }
+        if (ytPlayerRef.current && ytPlayerReady) {
+            ytPlayerRef.current.seekTo(newProgress / 1000, true);
         }
     };
 
     const handleNextTrack = () => {
-        if (isPreviewMode) {
-            if (previewQueue.length > 0 && previewIndex < previewQueue.length - 1) {
-                const nextIdx = previewIndex + 1;
-                setPreviewIndex(nextIdx);
-                playPreview(previewQueue[nextIdx]);
-            } else if (repeatMode === 'context' && previewQueue.length > 0) {
-                setPreviewIndex(0);
-                playPreview(previewQueue[0]);
-            } else {
-                setSpotifyPlaying(false);
-            }
+        const currentQueue = previewQueueRef.current;
+        const currentIndex = previewIndexRef.current;
+        
+        if (currentQueue.length === 0) return;
+        
+        let nextIdx = currentIndex + 1;
+        if (nextIdx < currentQueue.length) {
+            playTrack(currentQueue[nextIdx], currentQueue);
+        } else if (repeatMode === 'context') {
+            playTrack(currentQueue[0], currentQueue);
         } else {
-            player?.nextTrack();
+            setSpotifyPlaying(false);
         }
     };
 
     const handlePrevTrack = () => {
-        if (isPreviewMode) {
-            if (previewQueue.length > 0 && previewIndex > 0) {
-                const prevIdx = previewIndex - 1;
-                setPreviewIndex(prevIdx);
-                playPreview(previewQueue[prevIdx]);
-            } else if (repeatMode === 'context' && previewQueue.length > 0) {
-                const lastIdx = previewQueue.length - 1;
-                setPreviewIndex(lastIdx);
-                playPreview(previewQueue[lastIdx]);
-            }
-        } else {
-            player?.previousTrack();
+        const currentQueue = previewQueueRef.current;
+        const currentIndex = previewIndexRef.current;
+        
+        if (currentQueue.length === 0) return;
+        
+        let prevIdx = currentIndex - 1;
+        if (prevIdx >= 0) {
+            playTrack(currentQueue[prevIdx], currentQueue);
+        } else if (repeatMode === 'context') {
+            playTrack(currentQueue[currentQueue.length - 1], currentQueue);
         }
     };
 
     const handleTogglePlay = () => {
-        if (isPreviewMode) {
-            if (previewAudioRef.current) {
-                if (spotifyPlaying) {
-                    previewAudioRef.current.pause();
-                    setSpotifyPlaying(false);
-                } else {
-                    previewAudioRef.current.play().catch(e => console.error(e));
-                    setSpotifyPlaying(true);
-                }
-            }
+        if (!ytPlayerRef.current || !ytPlayerReady) return;
+        
+        if (spotifyPlaying) {
+            ytPlayerRef.current.pauseVideo();
+            setSpotifyPlaying(false);
         } else {
-            player?.togglePlay();
+            ytPlayerRef.current.playVideo();
+            setSpotifyPlaying(true);
         }
     };
 
     // Helper to search and play a search query as a playlist queue
-    const playGenreOrSong = async (query, forcePreview = false) => {
-        if (!spotifyToken && !isGuestMode && !forcePreview) return;
+    const playGenreOrSong = async (query) => {
         setIsSearching(true);
         try {
-            let res;
-            if (spotifyToken) {
-                res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=20`, {
-                    headers: { 'Authorization': `Bearer ${spotifyToken}` }
-                });
-            } else {
-                res = await fetch(`/api/spotify-search?q=${encodeURIComponent(query)}&limit=20`);
-            }
+            const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`);
             const data = await res.json();
-            if (data.tracks && data.tracks.items.length > 0) {
-                const tracks = data.tracks.items;
-                if (isPreviewMode || forcePreview || !deviceId) {
-                    setIsPreviewMode(true);
-                    setPreviewQueue(tracks);
-                    setPreviewIndex(0);
-                    playPreview(tracks[0]);
-                } else {
-                    const uris = tracks.map(t => t.uri);
-                    await playSpotifyTrack(uris[0], tracks);
-                }
+            if (data.tracks && data.tracks.length > 0) {
+                const mappedTracks = data.tracks.map(track => ({
+                    id: track.id,
+                    name: track.title,
+                    artists: [{ name: track.artist }],
+                    album: {
+                        images: [{ url: track.thumbnail }]
+                    },
+                    uri: track.uri,
+                    duration: track.duration,
+                    duration_ms: parseDurationToMs(track.duration)
+                }));
+                // Play first track and load the rest in the play queue
+                playSpotifyTrack(mappedTracks[0].uri, mappedTracks);
             }
         } catch (error) {
             console.error("Play genre error:", error);
@@ -794,38 +560,7 @@ export default function App() {
             {openApps.includes('app-spotify') && (
                 <DraggableWindow id="app-spotify" title="Spotify Web Player" dark defaultPos={{x: 200, y: 100}} width="w-[820px]" height="h-[530px]" isActive={activeApp === 'app-spotify'} bringToFront={setActiveApp} closeApp={handleCloseApp}>
                     <div className="flex flex-col h-full bg-[#121212] text-white relative">
-                        {!spotifyToken && !isGuestMode ? (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#1e1e1e] to-[#121212]">
-                                <Music size={64} className="text-[#1DB954] mb-6 animate-bounce" />
-                                <h2 className="text-2xl font-bold mb-2">Login with Spotify</h2>
-                                <p className="text-gray-400 text-sm mb-6 max-w-md">Connect your Spotify account securely to play full songs directly inside this OS.</p>
-                                <button 
-                                    onClick={handleSpotifyLogin}
-                                    className="bg-[#1DB954] text-black font-extrabold px-10 py-3.5 rounded-full hover:scale-105 hover:bg-green-400 transition-all shadow-[0_0_20px_rgba(29,185,84,0.4)] mb-4"
-                                >
-                                    Log in with Spotify
-                                </button>
-                                <button 
-                                    onClick={handleGuestMode}
-                                    className="bg-transparent border border-white/20 text-white font-bold px-8 py-2.5 rounded-full hover:scale-105 hover:bg-white/10 transition-all text-sm mb-6"
-                                >
-                                    Bina Login Ke Suniye (Guest Mode)
-                                </button>
-                                <div className="text-xs text-gray-500 max-w-md space-y-1 bg-white/5 p-3 rounded-lg border border-white/10">
-                                    <p className="font-bold text-yellow-500">💡 Kisi aur ke phone se connect nahi ho raha?</p>
-                                    <p>Spotify development restriction ke karan kewal whitelisted log hi direct login kar sakte hain. Dusre phones/accounts ke liye kripya <strong>Guest Mode</strong> ka upyog karein!</p>
-                                </div>
-                            </div>
-                        ) : !deviceId && !isPreviewMode ? (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#1e1e1e] to-[#121212]">
-                                <Music size={64} className="text-[#1DB954] mb-6 animate-pulse" />
-                                <h2 className="text-2xl font-bold mb-2">Connecting...</h2>
-                                <p className="text-gray-400 text-sm mb-6">Initializing Spotify Web Playback SDK.</p>
-                                <button onClick={handleSpotifyLogout} className="text-xs text-white/50 hover:text-white underline">Cancel / Logout</button>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex-1 flex overflow-hidden">
+                        <div className="flex-1 flex overflow-hidden">
                                     {/* Left Sidebar */}
                                     <div className="w-48 bg-[#000000] p-4 flex flex-col shrink-0">
                                         {/* Sidebar Navigation */}
@@ -846,12 +581,9 @@ export default function App() {
                                             </div>
                                         </div>
 
-                                        {isGuestMode && (
-                                            <div className="mx-1 mb-4 px-2.5 py-1.5 rounded bg-green-500/10 border border-green-500/20 text-[#1DB954] text-[10px] font-extrabold text-center uppercase tracking-widest animate-pulse">
-                                                Guest Mode
-                                            </div>
-                                        )}
-
+                                        <div className="mx-1 mb-4 px-2.5 py-1.5 rounded bg-red-500/10 border border-red-500/20 text-[#FF0000] text-[10px] font-extrabold text-center uppercase tracking-widest animate-pulse">
+                                            YT Music Mode
+                                        </div>
                                         {/* Playlists Section */}
                                         <div className="border-t border-[#282828] pt-4 flex-1 overflow-y-auto custom-scroll">
                                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Playlists</h4>
@@ -917,11 +649,9 @@ export default function App() {
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 {isSearching && <span className="text-[10px] text-[#1DB954] animate-pulse font-bold tracking-widest mr-2">SEARCHING...</span>}
-                                                {isPreviewMode && (
-                                                    <span className="text-[10px] bg-yellow-500/25 text-yellow-400 border border-yellow-500/30 px-2.5 py-1 rounded-full font-bold select-none mr-1 animate-pulse">
-                                                        Preview Mode (Free/Mobile)
-                                                    </span>
-                                                )}
+                                                <span className="text-[10px] bg-red-500/25 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-full font-bold select-none mr-1 animate-pulse">
+                                                    YT Music Active
+                                                </span>
                                                 <div className="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/5 cursor-default select-none">
                                                     <div className="w-5 h-5 rounded-full bg-[#1DB954] text-[10px] font-black text-black flex items-center justify-center">S</div>
                                                     <span className="text-xs font-bold text-white/95">Sahilpreet</span>
@@ -1154,8 +884,6 @@ export default function App() {
                                         />
                                     </div>
                                 </div>
-                            </>
-                        )}
                     </div>
                 </DraggableWindow>
             )}
@@ -1287,6 +1015,11 @@ export default function App() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Global Hidden YouTube Player Container */}
+            <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+                <div id="yt-player"></div>
             </div>
 
         </div>
