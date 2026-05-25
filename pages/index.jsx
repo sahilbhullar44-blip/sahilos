@@ -99,6 +99,7 @@ export default function App() {
     const [trackProgress, setTrackProgress] = useState(0);
     const [trackDuration, setTrackDuration] = useState(0);
     const [volume, setVolume] = useState(0.5);
+    const [musicUser, setMusicUser] = useState('Sahilpreet');
     
     // Play Queue States
     const [previewQueue, setPreviewQueue] = useState([]);
@@ -122,6 +123,15 @@ export default function App() {
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    const handleRenameUser = () => {
+        if (typeof window !== 'undefined') {
+            const newName = prompt("Enter profile name:", musicUser);
+            if (newName && newName.trim()) {
+                setMusicUser(newName.trim());
+            }
+        }
+    };
 
     // Stop Music Function
     const handleSpotifyLogout = () => {
@@ -559,331 +569,396 @@ export default function App() {
             {/* Spotify App Window */}
             {openApps.includes('app-spotify') && (
                 <DraggableWindow id="app-spotify" title="Spotify Web Player" dark defaultPos={{x: 200, y: 100}} width="w-[820px]" height="h-[530px]" isActive={activeApp === 'app-spotify'} bringToFront={setActiveApp} closeApp={handleCloseApp}>
-                    <div className="flex flex-col h-full bg-[#121212] text-white relative">
+                    <div className="flex flex-col h-full bg-[#0b0b0e] text-white relative">
                         <div className="flex-1 flex overflow-hidden">
-                                    {/* Left Sidebar */}
-                                    <div className="w-48 bg-[#000000] p-4 flex flex-col shrink-0">
-                                        {/* Sidebar Navigation */}
-                                        <div className="space-y-4 mb-6">
-                                            <div 
-                                                onClick={() => { setActiveTab('home'); setSearchResults([]); }}
-                                                className={`flex items-center space-x-3 cursor-pointer transition-colors ${activeTab === 'home' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-                                            >
-                                                <Smile size={20} />
-                                                <span className="text-sm font-bold">Home</span>
-                                            </div>
-                                            <div 
-                                                onClick={() => setActiveTab('search')}
-                                                className={`flex items-center space-x-3 cursor-pointer transition-colors ${activeTab === 'search' ? 'text-white' : 'text-gray-400 hover:text-white'}`}
-                                            >
-                                                <Search size={20} />
-                                                <span className="text-sm font-bold">Search</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="mx-1 mb-4 px-2.5 py-1.5 rounded bg-red-500/10 border border-red-500/20 text-[#FF0000] text-[10px] font-extrabold text-center uppercase tracking-widest animate-pulse">
-                                            YT Music Mode
-                                        </div>
-                                        {/* Playlists Section */}
-                                        <div className="border-t border-[#282828] pt-4 flex-1 overflow-y-auto custom-scroll">
-                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Playlists</h4>
-                                            <div className="space-y-2 text-xs text-gray-400">
-                                                <div 
-                                                    onClick={() => playGenreOrSong("lofi")}
-                                                    className="hover:text-white cursor-pointer truncate font-medium flex items-center"
-                                                >
-                                                    <Music size={14} className="mr-2 shrink-0 text-gray-500" />
-                                                    Lofi Study Chill
-                                                </div>
-                                                <div 
-                                                    onClick={() => playGenreOrSong("punjabi")}
-                                                    className="hover:text-white cursor-pointer truncate font-medium flex items-center"
-                                                >
-                                                    <Music size={14} className="mr-2 shrink-0 text-gray-500" />
-                                                    Punjabi Hits
-                                                </div>
-                                                <div 
-                                                    onClick={() => playGenreOrSong("top global")}
-                                                    className="hover:text-white cursor-pointer truncate font-medium flex items-center"
-                                                >
-                                                    <Music size={14} className="mr-2 shrink-0 text-gray-500" />
-                                                    Top 50 - Global
-                                                </div>
-                                                <div 
-                                                    onClick={() => playGenreOrSong("coding beats")}
-                                                    className="hover:text-white cursor-pointer truncate font-medium flex items-center"
-                                                >
-                                                    <Music size={14} className="mr-2 shrink-0 text-gray-500" />
-                                                    Coding Chillhop
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Sidebar footer */}
-                                        <button 
-                                            onClick={handleSpotifyLogout} 
-                                            className="text-[10px] font-bold tracking-wider text-gray-400 hover:text-white transition-colors border border-gray-800 hover:border-white/25 py-1.5 rounded-full mt-auto text-center"
-                                        >
-                                            LOG OUT
-                                        </button>
+                            {/* Left Sidebar */}
+                            <div className="w-48 bg-[#0b0b0f]/95 p-4 flex flex-col shrink-0 border-r border-white/5 backdrop-blur-xl">
+                                
+                                {/* User Profile Card */}
+                                <div 
+                                    onClick={handleRenameUser}
+                                    title="Click to change name"
+                                    className="flex items-center space-x-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl p-3 mb-6 cursor-pointer transition-all duration-200"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-xs font-black text-white flex items-center justify-center shadow-[0_0_10px_rgba(142,45,226,0.3)] shrink-0">
+                                        {musicUser ? musicUser[0].toUpperCase() : 'G'}
                                     </div>
-
-                                    {/* Main Content Window */}
-                                    <div className="flex-1 flex flex-col bg-gradient-to-b from-[#1c1c1c] to-[#121212] overflow-hidden">
-                                        {/* Header */}
-                                        <div className="px-6 py-4 bg-transparent flex items-center justify-between shrink-0">
-                                            <div className="flex items-center space-x-4">
-                                                {activeTab === 'search' && (
-                                                    <div className="relative w-72">
-                                                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="What do you want to listen to?"
-                                                            className="w-full bg-[#242424] text-xs text-white pl-11 pr-4 py-2 rounded-full focus:outline-none focus:ring-1 focus:ring-white/25 transition-all placeholder-gray-500 font-medium"
-                                                            value={searchQuery}
-                                                            onChange={e => setSearchQuery(e.target.value)}
-                                                            onKeyDown={e => e.key === 'Enter' && searchMusic(searchQuery)}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                {isSearching && <span className="text-[10px] text-[#1DB954] animate-pulse font-bold tracking-widest mr-2">SEARCHING...</span>}
-                                                <span className="text-[10px] bg-red-500/25 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-full font-bold select-none mr-1 animate-pulse">
-                                                    YT Music Active
-                                                </span>
-                                                <div className="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/5 cursor-default select-none">
-                                                    <div className="w-5 h-5 rounded-full bg-[#1DB954] text-[10px] font-black text-black flex items-center justify-center">S</div>
-                                                    <span className="text-xs font-bold text-white/95">Sahilpreet</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Scrollable Area */}
-                                        <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scroll">
-                                            {searchResults.length > 0 ? (
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <h3 className="text-lg font-black tracking-tight">Search Results</h3>
-                                                        <button onClick={() => setSearchResults([])} className="text-xs text-gray-400 hover:text-white font-bold transition">Clear</button>
-                                                    </div>
-                                                    <div className="space-y-1 bg-black/20 p-2 rounded-xl backdrop-blur-md border border-white/5">
-                                                        {searchResults.map((track, index) => (
-                                                            <div 
-                                                                key={track.id} 
-                                                                onClick={() => playSpotifyTrack(track.uri, searchResults.map(t => t.uri))}
-                                                                className="flex items-center p-2.5 hover:bg-white/10 rounded-lg cursor-pointer transition-colors group"
-                                                            >
-                                                                <span className="text-sm font-bold text-gray-500 w-6 text-center group-hover:hidden">{index + 1}</span>
-                                                                <Play size={14} className="text-[#1DB954] w-6 hidden group-hover:block fill-current mr-0" />
-                                                                <img src={track.album.images[2]?.url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17'} className="w-10 h-10 rounded mr-4 object-cover" alt={track.name} />
-                                                                <div className="flex-1 overflow-hidden">
-                                                                    <div className="text-sm font-bold truncate text-white group-hover:text-[#1DB954] transition-colors">{track.name}</div>
-                                                                    <div className="text-xs text-gray-400 truncate mt-0.5">{track.artists.map(a => a.name).join(', ')}</div>
-                                                                </div>
-                                                                <div className="text-xs text-gray-500 mr-4 hidden md:block truncate max-w-[150px]">{track.album.name}</div>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {Math.floor(track.duration_ms / 60000)}:
-                                                                    {String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : activeTab === 'search' ? (
-                                                <div>
-                                                    <h3 className="text-lg font-black tracking-tight mb-4">Browse All</h3>
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        <div onClick={() => playGenreOrSong("punjabi")} className="h-24 rounded-lg p-4 cursor-pointer bg-gradient-to-br from-pink-500 to-indigo-600 relative overflow-hidden group shadow-lg hover:scale-[1.02] transition-transform">
-                                                            <span className="text-sm font-black text-white">Punjabi Hits</span>
-                                                            <Music size={40} className="absolute -bottom-2 -right-2 text-white/20 transform rotate-12 group-hover:scale-110 transition-transform" />
-                                                        </div>
-                                                        <div onClick={() => playGenreOrSong("pop")} className="h-24 rounded-lg p-4 cursor-pointer bg-gradient-to-br from-green-500 to-teal-600 relative overflow-hidden group shadow-lg hover:scale-[1.02] transition-transform">
-                                                            <span className="text-sm font-black text-white">Pop</span>
-                                                            <Music size={40} className="absolute -bottom-2 -right-2 text-white/20 transform rotate-12 group-hover:scale-110 transition-transform" />
-                                                        </div>
-                                                        <div onClick={() => playGenreOrSong("lofi beats")} className="h-24 rounded-lg p-4 cursor-pointer bg-gradient-to-br from-purple-500 to-pink-600 relative overflow-hidden group shadow-lg hover:scale-[1.02] transition-transform">
-                                                            <span className="text-sm font-black text-white">Lofi & Chill</span>
-                                                            <Music size={40} className="absolute -bottom-2 -right-2 text-white/20 transform rotate-12 group-hover:scale-110 transition-transform" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                /* HOME VIEW */
-                                                <div className="space-y-6">
-                                                    <div>
-                                                        <h2 className="text-xl font-black tracking-tight mb-4">Good Afternoon</h2>
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <div onClick={() => playGenreOrSong("lofi study")} className="flex items-center bg-white/5 hover:bg-white/10 rounded-md overflow-hidden cursor-pointer transition-colors group relative pr-4">
-                                                                <img src="https://images.unsplash.com/photo-1518609878373-06d740f60d8b?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0" alt="Lofi" />
-                                                                <span className="text-xs font-bold truncate">Lofi Study beats</span>
-                                                                <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                    <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                </button>
-                                                            </div>
-                                                            <div onClick={() => playGenreOrSong("diljit dosanjh")} className="flex items-center bg-white/5 hover:bg-white/10 rounded-md overflow-hidden cursor-pointer transition-colors group relative pr-4">
-                                                                <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0" alt="Diljit" />
-                                                                <span className="text-xs font-bold truncate">Diljit Dosanjh hits</span>
-                                                                <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                    <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                </button>
-                                                            </div>
-                                                            <div onClick={() => playGenreOrSong("punjabi pop")} className="flex items-center bg-white/5 hover:bg-white/10 rounded-md overflow-hidden cursor-pointer transition-colors group relative pr-4">
-                                                                <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0" alt="Top Global" />
-                                                                <span className="text-xs font-bold truncate">Punjabi Pop Hits</span>
-                                                                <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                    <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                </button>
-                                                            </div>
-                                                            <div onClick={() => playGenreOrSong("coding mix")} className="flex items-center bg-white/5 hover:bg-white/10 rounded-md overflow-hidden cursor-pointer transition-colors group relative pr-4">
-                                                                <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0" alt="Coding" />
-                                                                <span className="text-xs font-bold truncate">Coding Chill Session</span>
-                                                                <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                    <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <h3 className="text-lg font-black tracking-tight mb-3">Recommended for You</h3>
-                                                        <div className="grid grid-cols-3 gap-4">
-                                                            <div onClick={() => playGenreOrSong("diljit dosanjh")} className="bg-[#181818] p-3.5 rounded-lg hover:bg-[#282828] cursor-pointer transition-colors group shadow-lg">
-                                                                <div className="relative mb-3 overflow-hidden rounded-md shadow-md">
-                                                                    <img src="https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover" alt="Diljit" />
-                                                                    <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                        <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                    </button>
-                                                                </div>
-                                                                <h4 className="text-xs font-bold text-white truncate">Diljit Dosanjh Mix</h4>
-                                                                <p className="text-[10px] text-gray-400 mt-1 truncate">Ultimate Punjabi playlist</p>
-                                                            </div>
-                                                            <div onClick={() => playGenreOrSong("study lofi")} className="bg-[#181818] p-3.5 rounded-lg hover:bg-[#282828] cursor-pointer transition-colors group shadow-lg">
-                                                                <div className="relative mb-3 overflow-hidden rounded-md shadow-md">
-                                                                    <img src="https://images.unsplash.com/photo-1485579149621-3123dd979885?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover" alt="Lofi Study" />
-                                                                    <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                        <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                    </button>
-                                                                </div>
-                                                                <h4 className="text-xs font-bold text-white truncate">Lofi Focus Session</h4>
-                                                                <p className="text-[10px] text-gray-400 mt-1 truncate">Instrumental chillhop beats</p>
-                                                            </div>
-                                                            <div onClick={() => playGenreOrSong("acoustic pop")} className="bg-[#181818] p-3.5 rounded-lg hover:bg-[#282828] cursor-pointer transition-colors group shadow-lg">
-                                                                <div className="relative mb-3 overflow-hidden rounded-md shadow-md">
-                                                                    <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover" alt="Acoustic" />
-                                                                    <button className="w-8 h-8 rounded-full bg-[#1DB954] text-black shadow-md flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-105 transition-all">
-                                                                        <Play size={14} fill="black" className="ml-0.5 text-black" />
-                                                                    </button>
-                                                                </div>
-                                                                <h4 className="text-xs font-bold text-white truncate">Acoustic Pop Chill</h4>
-                                                                <p className="text-[10px] text-gray-400 mt-1 truncate">Unplugged vocals and guitars</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
+                                    <div className="overflow-hidden">
+                                        <div className="text-xs font-extrabold text-white truncate">{musicUser}</div>
+                                        <div className="flex items-center text-[9px] text-[#27C93F] font-bold tracking-wider mt-0.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#27C93F] inline-block mr-1.5 animate-pulse"></span>
+                                            ONLINE
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Player controls (Bottom) */}
-                                <div className="bg-[#181818] px-4 py-3 flex items-center justify-between border-t border-[#282828] shadow-[0_-10px_20px_rgba(0,0,0,0.3)] shrink-0 select-none">
-                                    {/* Track detail info */}
-                                    <div className="flex items-center w-1/4 min-w-[150px] overflow-hidden">
-                                        {currentTrack ? (
-                                            <>
-                                                <img src={currentTrack.album.images[0]?.url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17'} className="w-12 h-12 rounded mr-3 shadow-md object-cover shrink-0" alt="Thumbnail" />
-                                                <div className="truncate">
-                                                    <div className="text-xs font-bold text-white truncate hover:underline cursor-pointer">{currentTrack.name}</div>
-                                                    <div className="text-[10px] text-gray-400 truncate hover:underline cursor-pointer">{currentTrack.artists.map(a => a.name).join(', ')}</div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="flex items-center space-x-3 text-gray-500">
-                                                <div className="w-12 h-12 rounded bg-white/5 flex items-center justify-center shrink-0">
-                                                    <Music size={16} />
-                                                </div>
-                                                <span className="text-xs font-medium">No track playing</span>
+                                {/* Sidebar Navigation */}
+                                <div className="space-y-2 mb-6">
+                                    <div 
+                                        onClick={() => { setActiveTab('home'); setSearchResults([]); }}
+                                        className={`flex items-center space-x-3 px-3 py-2 rounded-xl cursor-pointer transition-all hover:translate-x-1 duration-200 ${activeTab === 'home' ? 'bg-gradient-to-r from-[#8E2DE2]/20 to-transparent border-l-2 border-[#8E2DE2] text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                                    >
+                                        <Smile size={18} className={activeTab === 'home' ? 'text-[#8E2DE2]' : ''} />
+                                        <span className="text-xs font-bold">Discover</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => setActiveTab('search')}
+                                        className={`flex items-center space-x-3 px-3 py-2 rounded-xl cursor-pointer transition-all hover:translate-x-1 duration-200 ${activeTab === 'search' ? 'bg-gradient-to-r from-[#8E2DE2]/20 to-transparent border-l-2 border-[#8E2DE2] text-white font-bold' : 'text-gray-400 hover:text-white'}`}
+                                    >
+                                        <Search size={18} className={activeTab === 'search' ? 'text-[#8E2DE2]' : ''} />
+                                        <span className="text-xs font-bold">Search Tracks</span>
+                                    </div>
+                                </div>
+
+                                <div className="mx-1 mb-4 px-2.5 py-1.5 rounded-xl bg-[#8E2DE2]/10 border border-[#8E2DE2]/20 text-[#c892ff] text-[9px] font-black text-center uppercase tracking-widest select-none animate-[pulse_2s_infinite]">
+                                    🎵 Cyber-Cast Engine
+                                </div>
+
+                                {/* Playlists Section */}
+                                <div className="border-t border-white/5 pt-4 flex-1 overflow-y-auto custom-scroll select-none">
+                                    <div className="flex items-center justify-between mb-3 px-2">
+                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">My Library</h4>
+                                    </div>
+                                    <div className="space-y-1 text-xs text-gray-400">
+                                        <div 
+                                            onClick={() => playGenreOrSong("lofi")}
+                                            className="hover:text-white cursor-pointer truncate font-medium flex items-center px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                        >
+                                            <Music size={12} className="mr-2 shrink-0 text-[#8E2DE2]" />
+                                            Lofi Focus Beats
+                                        </div>
+                                        <div 
+                                            onClick={() => playGenreOrSong("punjabi")}
+                                            className="hover:text-white cursor-pointer truncate font-medium flex items-center px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                        >
+                                            <Music size={12} className="mr-2 shrink-0 text-[#8E2DE2]" />
+                                            Punjabi Hits
+                                        </div>
+                                        <div 
+                                            onClick={() => playGenreOrSong("top global")}
+                                            className="hover:text-white cursor-pointer truncate font-medium flex items-center px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                        >
+                                            <Music size={12} className="mr-2 shrink-0 text-[#8E2DE2]" />
+                                            Top 50 - Global
+                                        </div>
+                                        <div 
+                                            onClick={() => playGenreOrSong("coding beats")}
+                                            className="hover:text-white cursor-pointer truncate font-medium flex items-center px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                        >
+                                            <Music size={12} className="mr-2 shrink-0 text-[#8E2DE2]" />
+                                            Coding Chillhop
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Sidebar footer */}
+                                <button 
+                                    onClick={handleSpotifyLogout} 
+                                    className="text-[9px] font-black tracking-widest text-red-400 hover:text-white transition-colors border border-red-500/20 hover:border-red-500/60 bg-red-950/10 hover:bg-red-500/10 py-2 rounded-xl mt-auto text-center uppercase"
+                                >
+                                    Reset Player
+                                </button>
+                            </div>
+
+                            {/* Main Content Window */}
+                            <div className="flex-1 flex flex-col bg-gradient-to-b from-[#0e0a16] to-[#07070a] overflow-hidden relative">
+                                {/* Ambient radial-gradient background for luxury depth */}
+                                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#8E2DE2]/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+                                {/* Header */}
+                                <div className="px-6 py-4 bg-transparent flex items-center justify-between shrink-0 relative z-10">
+                                    <div className="flex items-center space-x-4">
+                                        {activeTab === 'search' && (
+                                            <div className="relative w-72">
+                                                <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search songs, artists, genres..."
+                                                    className="w-full bg-white/5 border border-white/15 focus:border-[#8E2DE2] text-xs text-white pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#8E2DE2]/30 transition-all placeholder-gray-500 font-semibold"
+                                                    value={searchQuery}
+                                                    onChange={e => setSearchQuery(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && searchMusic(searchQuery)}
+                                                />
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Playback action buttons */}
-                                    <div className="flex flex-col items-center justify-center w-2/4 max-w-[450px]">
-                                        <div className="flex items-center gap-5 mb-1.5">
-                                            <button 
-                                                onClick={toggleSpotifyShuffle} 
-                                                className={`transition-colors ${shuffleMode ? 'text-[#1DB954] hover:text-[#1ed760]' : 'text-gray-400 hover:text-white'}`}
-                                                title="Shuffle"
-                                            >
-                                                <Shuffle size={15} className={shuffleMode ? 'stroke-[2.5px]' : ''} />
-                                            </button>
-                                            <button 
-                                                onClick={handlePrevTrack} 
-                                                className="text-gray-400 hover:text-white transition-colors"
-                                                title="Previous"
-                                            >
-                                                <SkipBack size={18} fill="currentColor" />
-                                            </button>
-                                            <button 
-                                                onClick={handleTogglePlay} 
-                                                className="w-8 h-8 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
-                                                title={spotifyPlaying ? "Pause" : "Play"}
-                                            >
-                                                {spotifyPlaying ? <Pause size={14} className="text-black fill-black" /> : <Play size={14} className="text-black fill-black ml-0.5" />}
-                                            </button>
-                                            <button 
-                                                onClick={handleNextTrack} 
-                                                className="text-gray-400 hover:text-white transition-colors"
-                                                title="Next"
-                                            >
-                                                <SkipForward size={18} fill="currentColor" />
-                                            </button>
-                                            <button 
-                                                onClick={toggleSpotifyRepeat} 
-                                                className={`transition-colors relative ${repeatMode !== 'off' ? 'text-[#1DB954] hover:text-[#1ed760]' : 'text-gray-400 hover:text-white'}`}
-                                                title={`Repeat: ${repeatMode}`}
-                                            >
-                                                <Repeat size={15} className={repeatMode !== 'off' ? 'stroke-[2.5px]' : ''} />
-                                                {repeatMode === 'track' && <div className="w-1.5 h-1.5 bg-[#1DB954] rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 scale-55"></div>}
-                                            </button>
-                                        </div>
-
-                                        {/* Progress Bar slider */}
-                                        <div className="flex items-center w-full gap-2 text-[10px] text-gray-400 font-medium select-none">
-                                            <span>
-                                                {Math.floor(trackProgress / 60000)}:
-                                                {String(Math.floor((trackProgress % 60000) / 1000)).padStart(2, '0')}
-                                            </span>
-                                            <input 
-                                                type="range"
-                                                min="0"
-                                                max={trackDuration || 0}
-                                                value={trackProgress}
-                                                onChange={handleSeek}
-                                                className="w-full h-1 bg-[#4d4d4d] rounded-full appearance-none cursor-pointer accent-white hover:accent-[#1DB954] focus:outline-none outline-none"
-                                            />
-                                            <span>
-                                                {Math.floor(trackDuration / 60000)}:
-                                                {String(Math.floor((trackDuration % 60000) / 1000)).padStart(2, '0')}
-                                            </span>
+                                    <div className="flex items-center space-x-2">
+                                        {isSearching && (
+                                            <div className="flex items-center space-x-1.5 mr-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#8E2DE2] animate-bounce"></span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#8E2DE2] animate-bounce [animation-delay:0.2s]"></span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#8E2DE2] animate-bounce [animation-delay:0.4s]"></span>
+                                                <span className="text-[10px] text-[#c892ff] font-black tracking-widest uppercase">SEARCHING</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 cursor-default select-none">
+                                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-[10px] font-black text-white flex items-center justify-center">
+                                                {musicUser ? musicUser[0].toUpperCase() : 'G'}
+                                            </div>
+                                            <span className="text-xs font-bold text-white/90">{musicUser}</span>
                                         </div>
                                     </div>
+                                </div>
 
-                                    {/* Volume control slider */}
-                                    <div className="flex items-center justify-end w-1/4 gap-2 text-gray-400">
-                                        <Volume2 size={16} />
+                                {/* Scrollable Area */}
+                                <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scroll relative z-10">
+                                    {searchResults.length > 0 ? (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-base font-black tracking-tight">Search Results</h3>
+                                                <button onClick={() => setSearchResults([])} className="text-xs text-gray-400 hover:text-white font-bold transition">Clear</button>
+                                            </div>
+                                            <div className="space-y-1.5 bg-black/20 p-2 rounded-2xl backdrop-blur-md border border-white/5">
+                                                {searchResults.map((track, index) => {
+                                                    const isCurrentTrack = currentTrack?.id === track.id;
+                                                    return (
+                                                        <div 
+                                                            key={track.id} 
+                                                            onClick={() => playSpotifyTrack(track.uri, searchResults)}
+                                                            className={`flex items-center p-2 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-xl cursor-pointer transition-all duration-200 group ${isCurrentTrack ? 'bg-[#8E2DE2]/10 border-[#8E2DE2]/20' : ''}`}
+                                                        >
+                                                            <div className="w-8 flex items-center justify-center mr-2">
+                                                                {isCurrentTrack && spotifyPlaying ? (
+                                                                    <div className="flex items-end justify-center space-x-0.5 h-3.5 w-4 select-none">
+                                                                        <div className="w-[2px] bg-[#8E2DE2] animate-[bounce_0.8s_infinite] h-full"></div>
+                                                                        <div className="w-[2px] bg-[#8E2DE2] animate-[bounce_0.8s_infinite_0.2s] h-2/3"></div>
+                                                                        <div className="w-[2px] bg-[#8E2DE2] animate-[bounce_0.8s_infinite_0.4s] h-4/5"></div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className={`text-xs font-bold text-gray-500 group-hover:hidden ${isCurrentTrack ? 'text-[#8E2DE2]' : ''}`}>{index + 1}</span>
+                                                                        <Play size={12} className="text-[#8E2DE2] hidden group-hover:block fill-current" />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            <div className="relative w-10 h-10 mr-4 shrink-0 rounded-lg overflow-hidden border border-white/5 shadow-md">
+                                                                <img src={track.album?.images?.[0]?.url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17'} className="w-full h-full object-cover" alt={track.name} />
+                                                            </div>
+
+                                                            <div className="flex-1 overflow-hidden">
+                                                                <div className={`text-xs font-bold truncate transition-colors ${isCurrentTrack ? 'text-[#8E2DE2]' : 'text-white'}`}>{track.name}</div>
+                                                                <div className="text-[10px] text-gray-400 truncate mt-0.5 font-medium">{track.artists.map(a => a.name).join(', ')}</div>
+                                                            </div>
+
+                                                            <span className="text-[10px] text-gray-400 font-semibold px-3 select-none">
+                                                                {track.duration}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : activeTab === 'search' ? (
+                                        <div>
+                                            <h3 className="text-sm font-black text-white/50 uppercase tracking-widest mb-4 select-none">Explore Genres</h3>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div onClick={() => playGenreOrSong("punjabi")} className="h-28 rounded-2xl p-4 cursor-pointer bg-gradient-to-br from-[#FF007A] to-[#9600FF] relative overflow-hidden group shadow-lg hover:scale-[1.03] transition-all duration-300 border border-white/10 hover:shadow-[0_8px_24px_rgba(150,0,255,0.4)]">
+                                                    <span className="text-sm font-black text-white drop-shadow-md">Punjabi Hits</span>
+                                                    <Music size={44} className="absolute -bottom-2 -right-2 text-white/10 transform rotate-12 group-hover:scale-125 group-hover:rotate-45 transition-all duration-300" />
+                                                </div>
+                                                <div onClick={() => playGenreOrSong("lofi chill")} className="h-28 rounded-2xl p-4 cursor-pointer bg-gradient-to-br from-[#0052D4] via-[#4364F7] to-[#6FB1FC] relative overflow-hidden group shadow-lg hover:scale-[1.03] transition-all duration-300 border border-white/10 hover:shadow-[0_8px_24px_rgba(67,100,247,0.4)]">
+                                                    <span className="text-sm font-black text-white drop-shadow-md">Lofi & Chill</span>
+                                                    <Music size={44} className="absolute -bottom-2 -right-2 text-white/10 transform rotate-12 group-hover:scale-125 group-hover:rotate-45 transition-all duration-300" />
+                                                </div>
+                                                <div onClick={() => playGenreOrSong("top songs")} className="h-28 rounded-2xl p-4 cursor-pointer bg-gradient-to-br from-[#12C2E9] via-[#C471ED] to-[#F64F59] relative overflow-hidden group shadow-lg hover:scale-[1.03] transition-all duration-300 border border-white/10 hover:shadow-[0_8px_24px_rgba(196,113,237,0.4)]">
+                                                    <span className="text-sm font-black text-white drop-shadow-md">Top Charts</span>
+                                                    <Music size={44} className="absolute -bottom-2 -right-2 text-white/10 transform rotate-12 group-hover:scale-125 group-hover:rotate-45 transition-all duration-300" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* HOME VIEW */
+                                        <div className="space-y-6 select-none">
+                                            <div>
+                                                <h2 className="text-lg font-black tracking-tight text-white/90 mb-4">
+                                                    {(() => {
+                                                        const hour = new Date().getHours();
+                                                        if (hour < 12) return `Good Morning, ${musicUser}`;
+                                                        if (hour < 17) return `Good Afternoon, ${musicUser}`;
+                                                        return `Good Evening, ${musicUser}`;
+                                                    })()}
+                                                </h2>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div onClick={() => playGenreOrSong("lofi study beats")} className="flex items-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl overflow-hidden cursor-pointer transition-all duration-200 group relative pr-4 hover:scale-[1.01]">
+                                                        <img src="https://images.unsplash.com/photo-1518609878373-06d740f60d8b?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0 border-r border-white/5" alt="Lofi" />
+                                                        <span className="text-xs font-bold truncate">Lofi Study Beats</span>
+                                                        <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                            <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                        </button>
+                                                    </div>
+                                                    <div onClick={() => playGenreOrSong("diljit dosanjh")} className="flex items-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl overflow-hidden cursor-pointer transition-all duration-200 group relative pr-4 hover:scale-[1.01]">
+                                                        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0 border-r border-white/5" alt="Diljit" />
+                                                        <span className="text-xs font-bold truncate">Diljit Dosanjh Hits</span>
+                                                        <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                            <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                        </button>
+                                                    </div>
+                                                    <div onClick={() => playGenreOrSong("punjabi pop")} className="flex items-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl overflow-hidden cursor-pointer transition-all duration-200 group relative pr-4 hover:scale-[1.01]">
+                                                        <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0 border-r border-white/5" alt="Top Global" />
+                                                        <span className="text-xs font-bold truncate">Punjabi Pop Hits</span>
+                                                        <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                            <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                        </button>
+                                                    </div>
+                                                    <div onClick={() => playGenreOrSong("coding beats lofi")} className="flex items-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl overflow-hidden cursor-pointer transition-all duration-200 group relative pr-4 hover:scale-[1.01]">
+                                                        <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=200&auto=format&fit=crop" className="w-14 h-14 object-cover mr-4 shrink-0" alt="Coding" />
+                                                        <span className="text-xs font-bold truncate">Coding Chill Session</span>
+                                                        <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute right-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                            <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="text-sm font-black text-white/50 uppercase tracking-widest mb-3">Recommended for You</h3>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div onClick={() => playGenreOrSong("sidhu moose wala")} className="bg-[#100D1A]/60 border border-white/5 p-3.5 rounded-2xl hover:bg-white/5 cursor-pointer transition-all duration-300 group shadow-lg hover:-translate-y-1">
+                                                        <div className="relative mb-3 overflow-hidden rounded-xl border border-white/10 shadow-md">
+                                                            <img src="https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover group-hover:scale-105 transition-transform duration-500" alt="Sidhu Moose Wala" />
+                                                            <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                                <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                            </button>
+                                                        </div>
+                                                        <h4 className="text-xs font-bold text-white truncate">Sidhu Moose Wala Mix</h4>
+                                                        <p className="text-[10px] text-gray-400 mt-1 truncate">Sidhu Moose Wala & Punjabi Legends</p>
+                                                    </div>
+                                                    <div onClick={() => playGenreOrSong("focus instrumental lofi")} className="bg-[#100D1A]/60 border border-white/5 p-3.5 rounded-2xl hover:bg-white/5 cursor-pointer transition-all duration-300 group shadow-lg hover:-translate-y-1">
+                                                        <div className="relative mb-3 overflow-hidden rounded-xl border border-white/10 shadow-md">
+                                                            <img src="https://images.unsplash.com/photo-1485579149621-3123dd979885?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover group-hover:scale-105 transition-transform duration-500" alt="Lofi Study" />
+                                                            <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                                <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                            </button>
+                                                        </div>
+                                                        <h4 className="text-xs font-bold text-white truncate">Lofi Focus Session</h4>
+                                                        <p className="text-[10px] text-gray-400 mt-1 truncate">Instrumental study & work beats</p>
+                                                    </div>
+                                                    <div onClick={() => playGenreOrSong("viral acoustic songs")} className="bg-[#100D1A]/60 border border-white/5 p-3.5 rounded-2xl hover:bg-white/5 cursor-pointer transition-all duration-300 group shadow-lg hover:-translate-y-1">
+                                                        <div className="relative mb-3 overflow-hidden rounded-xl border border-white/10 shadow-md">
+                                                            <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?q=80&w=300&auto=format&fit=crop" className="w-full h-24 object-cover group-hover:scale-105 transition-transform duration-500" alt="Acoustic" />
+                                                            <button className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#8E2DE2] to-[#4A00E0] text-white shadow-lg flex items-center justify-center absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 hover:scale-115 transition-all">
+                                                                <Play size={12} fill="white" className="ml-0.5 text-white" />
+                                                            </button>
+                                                        </div>
+                                                        <h4 className="text-xs font-bold text-white truncate">Acoustic Chill Hits</h4>
+                                                        <p className="text-[10px] text-gray-400 mt-1 truncate">Sweet unplugged vocals & chords</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Player controls (Bottom) */}
+                        <div className="bg-[#0B0B0E]/95 px-5 py-4 flex items-center justify-between border-t border-white/10 shadow-[0_-15px_30px_rgba(0,0,0,0.6)] shrink-0 select-none backdrop-blur-xl relative z-25">
+                            {/* Track detail info */}
+                            <div className="flex items-center w-1/4 min-w-[150px] overflow-hidden">
+                                {currentTrack ? (
+                                    <>
+                                        <div className="relative shrink-0 mr-3">
+                                            <img 
+                                                src={currentTrack.album.images[0]?.url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17'} 
+                                                className={`w-11 h-11 rounded-full shadow-lg object-cover border border-white/10 ${spotifyPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`} 
+                                                alt="Thumbnail" 
+                                            />
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#0B0B0E] border border-white/15"></div>
+                                        </div>
+                                        <div className="truncate">
+                                            <div className="text-xs font-bold text-white truncate hover:underline cursor-pointer">{currentTrack.name}</div>
+                                            <div className="text-[10px] text-gray-400 truncate hover:underline cursor-pointer mt-0.5">{currentTrack.artists.map(a => a.name).join(', ')}</div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center space-x-3 text-gray-500">
+                                        <div className="w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center shrink-0">
+                                            <Music size={14} />
+                                        </div>
+                                        <span className="text-[11px] font-bold tracking-wider uppercase text-gray-500">No Song</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Playback action controls */}
+                            <div className="flex flex-col items-center justify-center w-2/4 max-w-[450px]">
+                                <div className="flex items-center gap-5 mb-2">
+                                    <button 
+                                        onClick={toggleSpotifyShuffle} 
+                                        className={`transition-all duration-200 hover:scale-110 ${shuffleMode ? 'text-[#8E2DE2] drop-shadow-[0_0_8px_rgba(142,45,226,0.6)]' : 'text-gray-400 hover:text-white'}`}
+                                        title="Shuffle"
+                                    >
+                                        <Shuffle size={14} className={shuffleMode ? 'stroke-[2.5px]' : ''} />
+                                    </button>
+                                    <button 
+                                        onClick={handlePrevTrack} 
+                                        className="text-gray-400 hover:text-white hover:scale-110 transition-all duration-200"
+                                        title="Previous"
+                                    >
+                                        <SkipBack size={16} fill="currentColor" />
+                                    </button>
+                                    <button 
+                                        onClick={handleTogglePlay} 
+                                        className="w-9 h-9 flex items-center justify-center bg-white hover:bg-gray-100 text-black rounded-full hover:scale-110 active:scale-95 transition-all duration-200 shadow-md"
+                                        title={spotifyPlaying ? "Pause" : "Play"}
+                                    >
+                                        {spotifyPlaying ? <Pause size={14} className="text-black fill-black" /> : <Play size={14} className="text-black fill-black ml-0.5" />}
+                                    </button>
+                                    <button 
+                                        onClick={handleNextTrack} 
+                                        className="text-gray-400 hover:text-white hover:scale-110 transition-all duration-200"
+                                        title="Next"
+                                    >
+                                        <SkipForward size={16} fill="currentColor" />
+                                    </button>
+                                    <button 
+                                        onClick={toggleSpotifyRepeat} 
+                                        className={`transition-all duration-200 hover:scale-110 relative ${repeatMode !== 'off' ? 'text-[#8E2DE2] drop-shadow-[0_0_8px_rgba(142,45,226,0.6)]' : 'text-gray-400 hover:text-white'}`}
+                                        title={`Repeat: ${repeatMode}`}
+                                    >
+                                        <Repeat size={14} className={repeatMode !== 'off' ? 'stroke-[2.5px]' : ''} />
+                                        {repeatMode === 'track' && <div className="w-1 h-1 bg-[#8E2DE2] rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2"></div>}
+                                    </button>
+                                </div>
+
+                                {/* Progress Slider */}
+                                <div className="flex items-center w-full gap-2.5 text-[9px] text-gray-500 font-bold select-none">
+                                    <span className="w-8 text-right">
+                                        {Math.floor(trackProgress / 60000)}:
+                                        {String(Math.floor((trackProgress % 60000) / 1000)).padStart(2, '0')}
+                                    </span>
+                                    <div className="relative flex-1 group">
                                         <input 
                                             type="range"
                                             min="0"
-                                            max="1"
-                                            step="0.05"
-                                            value={volume}
-                                            onChange={handleVolumeChange}
-                                            className="w-16 h-1 bg-[#4d4d4d] rounded-full appearance-none cursor-pointer accent-white hover:accent-[#1DB954] focus:outline-none outline-none"
+                                            max={trackDuration || 0}
+                                            value={trackProgress}
+                                            onChange={handleSeek}
+                                            className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#8E2DE2] hover:accent-[#8E2DE2] focus:outline-none outline-none transition-all"
                                         />
                                     </div>
+                                    <span className="w-8 text-left">
+                                        {Math.floor(trackDuration / 60000)}:
+                                        {String(Math.floor((trackDuration % 60000) / 1000)).padStart(2, '0')}
+                                    </span>
                                 </div>
+                            </div>
+
+                            {/* Volume control slider */}
+                            <div className="flex items-center justify-end w-1/4 gap-2 text-gray-400">
+                                <Volume2 size={15} />
+                                <input 
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={volume}
+                                    onChange={handleVolumeChange}
+                                    className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white hover:accent-[#8E2DE2] focus:outline-none outline-none transition-all"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </DraggableWindow>
             )}

@@ -21,32 +21,48 @@ export default async function handler(req, res) {
         }
 
         const data = JSON.parse(match[1]);
-        const contents = data.contents?.twoColumnSearchResultRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents;
 
-        if (!contents) {
+        // Recursive search for videoRenderers
+        const videoRenderers = [];
+        const findVideos = (obj) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.videoRenderer) {
+                videoRenderers.push(obj.videoRenderer);
+            }
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    findVideos(obj[key]);
+                }
+            }
+        };
+        findVideos(data);
+
+        if (videoRenderers.length === 0) {
             return res.status(200).json({ tracks: [] });
         }
 
         const videos = [];
-        for (const item of contents) {
-            if (item.videoRenderer) {
-                const vr = item.videoRenderer;
-                const videoId = vr.videoId;
-                const title = vr.title?.runs?.[0]?.text;
-                const thumbnail = vr.thumbnail?.thumbnails?.[0]?.url;
-                const artist = vr.ownerText?.runs?.[0]?.text;
-                const duration = vr.lengthText?.simpleText || "0:00";
+        const seenIds = new Set();
 
-                if (videoId && title) {
-                    videos.push({
-                        id: videoId,
-                        title,
-                        thumbnail,
-                        artist,
-                        duration,
-                        uri: `youtube:track:${videoId}`
-                    });
-                }
+        for (const vr of videoRenderers) {
+            const videoId = vr.videoId;
+            if (!videoId || seenIds.has(videoId)) continue;
+
+            const title = vr.title?.runs?.[0]?.text || vr.title?.simpleText;
+            const thumbnail = vr.thumbnail?.thumbnails?.[0]?.url;
+            const artist = vr.ownerText?.runs?.[0]?.text || vr.shortBylineText?.runs?.[0]?.text;
+            const duration = vr.lengthText?.simpleText || "0:00";
+
+            if (title) {
+                seenIds.add(videoId);
+                videos.push({
+                    id: videoId,
+                    title,
+                    thumbnail,
+                    artist: artist || "Unknown Artist",
+                    duration,
+                    uri: `youtube:track:${videoId}`
+                });
             }
         }
 
