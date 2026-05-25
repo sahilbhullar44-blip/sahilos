@@ -92,7 +92,7 @@ export default function App() {
     const [videoProgress, setVideoProgress] = useState(0);
 
     // --- SPOTIFY OAUTH (LOGIN) CONSTANTS ---
-    const SPOTIFY_CLIENT_ID = "YOUR_CLIENT_ID_HERE"; 
+    const SPOTIFY_CLIENT_ID = "2420d19b204e4423b0080864f124c9e3"; 
     const SPOTIFY_REDIRECT_URI = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : 'http://localhost:3000';
     const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
     const RESPONSE_TYPE = "token";
