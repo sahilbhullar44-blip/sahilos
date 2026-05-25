@@ -8,6 +8,34 @@ import {
     SkipBack, SkipForward, Volume2, Video, PlayCircle, Atom 
 } from 'lucide-react';
 
+// --- SPOTIFY PKCE HELPERS ---
+const generateRandomString = (length) => {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < length; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+};
+
+const sha256 = async (plain) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plain);
+    return window.crypto.subtle.digest('SHA-256', data);
+};
+
+const base64urlencode = (a) => {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(a)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+};
+
+const generateCodeChallenge = async (codeVerifier) => {
+    const hashed = await sha256(codeVerifier);
+    return base64urlencode(hashed);
+};
+
 // --- Reusable Draggable Window Component ---
 const DraggableWindow = ({ id, title, defaultPos, isActive, bringToFront, closeApp, children, dark, width = "w-[600px]", height = "h-[400px]" }) => {
     const [pos, setPos] = useState(defaultPos);
@@ -105,28 +133,70 @@ export default function App() {
     // Handle Spotify Login & Token Extraction
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const hash = window.location.hash;
+
         let token = window.localStorage.getItem("spotifyToken");
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
 
-        // Jab user login karke wapas aayega, toh URL me token hoga
-        if (hash && hash.includes("access_token")) {
-            token = hash.substring(1).split("&").find(elem => elem.startsWith("access_token")).split("=")[1];
-            window.location.hash = "";
-            window.localStorage.setItem("spotifyToken", token);
-        }
+        if (code) {
+            const codeVerifier = window.localStorage.getItem("spotify_code_verifier");
+            const fetchToken = async () => {
+                try {
+                    const response = await fetch('https://accounts.spotify.com/api/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            client_id: SPOTIFY_CLIENT_ID,
+                            grant_type: 'authorization_code',
+                            code: code,
+                            redirect_uri: SPOTIFY_REDIRECT_URI,
+                            code_verifier: codeVerifier,
+                        }),
+                    });
 
-        if (token) {
+                    const data = await response.json();
+                    if (data.access_token) {
+                        window.localStorage.setItem("spotifyToken", data.access_token);
+                        setSpotifyToken(data.access_token);
+                        // Clean up URL query parameters
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    } else if (data.error) {
+                        console.error("Token exchange failed:", data.error_description || data.error);
+                    }
+                } catch (error) {
+                    console.error("Error exchanging Spotify code:", error);
+                }
+            };
+            fetchToken();
+        } else if (token) {
             setSpotifyToken(token);
         }
     }, []);
 
     // Login Redirect Function
-    const handleSpotifyLogin = () => {
+    const handleSpotifyLogin = async () => {
         if (SPOTIFY_CLIENT_ID === "YOUR_CLIENT_ID_HERE") {
             alert("Bhai code mein apna Spotify Client ID daalna mat bhoolna!");
             return;
         }
-        window.location.href = `${AUTH_ENDPOINT}?client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&response_type=${RESPONSE_TYPE}&scope=${encodeURIComponent(SCOPES)}`;
+
+        const codeVerifier = generateRandomString(128);
+        window.localStorage.setItem("spotify_code_verifier", codeVerifier);
+
+        const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: SPOTIFY_CLIENT_ID,
+            scope: SCOPES,
+            redirect_uri: SPOTIFY_REDIRECT_URI,
+            code_challenge_method: 'S256',
+            code_challenge: codeChallenge,
+        });
+
+        window.location.href = `${AUTH_ENDPOINT}?${params.toString()}`;
     };
 
     // Logout Function
